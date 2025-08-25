@@ -1,0 +1,586 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tsn 1</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.6.0/shaka-player.ui.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.6.0/controls.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --primary: #00a8ff;
+    --primary-dark: #0078cc;
+    --bg-dark: #0a0a12;
+    --bg-darker: #050508;
+    --text-light: #f0f0f0;
+    --text-muted: #aaaaaa;
+    --control-bg: rgba(20, 20, 30, 0.9);
+    --control-bg-hover: rgba(40, 40, 60, 0.9);
+    --seekbar-buffered: rgba(100, 100, 120, 0.6);
+    --seekbar-played: var(--primary);
+    --volume-level: var(--primary);
+    --error-red: #ff4d4d;
+  }
+
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  html, body {
+    background: var(--bg-darker);
+    height: 100vh;
+    width: 100vw;
+    overflow: hidden;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    color: var(--text-light);
+  }
+
+  .shaka-video-container {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+  }
+
+  video {
+    width: 100%;
+    height: 100%;
+    background: #000;
+    object-fit: contain;
+  }
+
+  /* Custom spinner */
+  .loading-spinner {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 10;
+    display: none;
+  }
+
+  .spinner {
+    width: 50px;
+    height: 50px;
+    border: 4px solid rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+    border-top-color: var(--primary);
+    animation: spin 1s ease-in-out infinite;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  /* Custom UI overrides */
+  .shaka-overflow-menu, 
+  .shaka-settings-menu {
+    background-color: var(--control-bg) !important;
+    border-radius: 8px !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3) !important;
+  }
+
+  .shaka-controls-button:hover {
+    background-color: var(--control-bg-hover) !important;
+  }
+
+  .shaka-seek-bar-container {
+    height: 4px !important;
+  }
+
+  .shaka-volume-bar-container {
+    height: 4px !important;
+  }
+
+  /* Custom branding */
+  .player-brand {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .brand-logo {
+    height: 30px;
+    filter: drop-shadow(0 0 8px rgba(0, 168, 255, 0.5));
+  }
+
+  .brand-text {
+    font-size: 18px;
+    font-weight: 600;
+    color: white;
+    text-shadow: 0 0 8px rgba(0, 168, 255, 0.5);
+  }
+
+  /* Quality indicator */
+  .quality-indicator {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background: rgba(0, 0, 0, 0.7);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    z-index: 5;
+  }
+
+  /* Error message */
+  .error-message {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0, 0, 0, 0.8);
+    padding: 20px;
+    border-radius: 8px;
+    text-align: center;
+    max-width: 80%;
+    display: none;
+    z-index: 20;
+  }
+
+  .error-title {
+    color: var(--error-red);
+    font-size: 18px;
+    margin-bottom: 10px;
+  }
+
+  .error-details {
+    color: var(--text-muted);
+    font-size: 14px;
+  }
+
+  /* Hide default spinner */
+  .shaka-spinner-container,
+  .shaka-spinner,
+  .shaka-spinner-svg {
+    display: none !important;
+  }
+
+  /* Telegram Popup Styles */
+  .telegram-popup {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    transition: all 0.3s ease;
+  }
+
+  .telegram-button {
+    background-color: #0088cc;
+    color: white;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    transition: all 0.3s ease;
+  }
+
+  .telegram-button:hover {
+    background-color: #0077b5;
+    transform: scale(1.1);
+  }
+
+  .telegram-button svg {
+    width: 24px;
+    height: 24px;
+    fill: white;
+  }
+
+  .telegram-link {
+    background-color: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 10px 15px;
+    border-radius: 25px;
+    margin-right: 10px;
+    white-space: nowrap;
+    max-width: 0;
+    overflow: hidden;
+    transition: max-width 0.3s ease, padding 0.3s ease, opacity 0.3s ease;
+    opacity: 0;
+    cursor: pointer;
+  }
+
+  .telegram-popup.expanded .telegram-link {
+    max-width: 300px;
+    padding: 10px 15px;
+    opacity: 1;
+  }
+
+  .telegram-popup.expanded .telegram-button {
+    transform: scale(1.1);
+  }
+
+  /* Telegram Modal Popup Styles */
+  .modal {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100vw; height: 100vh;
+    backdrop-filter: blur(6px);
+    background: rgba(0,0,0,0.4);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+    animation: fadeIn 0.5s ease;
+  }
+  .modal-content {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 20px;
+    padding: 30px 25px;
+    width: 90%;
+    max-width: 400px;
+    text-align: center;
+    color: #f3f4f6;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    backdrop-filter: blur(12px);
+    transform: scale(0.95);
+    animation: scaleIn 0.4s ease forwards;
+  }
+  .modal-content h2 {
+    font-size: 24px;
+    font-weight: 700;
+    color: #facc15;
+    margin-bottom: 16px;
+  }
+  .modal-content p {
+    font-size: 16px;
+    color: #d1d5db;
+    margin-bottom: 24px;
+    line-height: 1.5;
+  }
+  .modal-content strong {
+    color: #fff;
+  }
+  .modal-content button {
+    width: 100%;
+    padding: 12px;
+    font-size: 16px;
+    border: none;
+    border-radius: 12px;
+    margin-bottom: 12px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+  }
+  #joinButton {
+    background: linear-gradient(to right, #3b82f6, #06b6d4);
+    color: #fff;
+    font-weight: 500;
+  }
+  #joinButton:hover {
+    background: linear-gradient(to right, #2563eb, #0891b2);
+    transform: scale(1.02);
+  }
+  #closeButton {
+    background: rgba(255, 255, 255, 0.1);
+    color: #f3f4f6;
+  }
+  #closeButton:hover {
+    background: rgba(255, 255, 255, 0.15);
+    transform: scale(1.02);
+  }
+
+  @keyframes fadeIn {
+    from {opacity: 0;}
+    to {opacity: 1;}
+  }
+  @keyframes scaleIn {
+    to {transform: scale(1); opacity: 1;}
+  }
+</style>
+</head>
+<body oncontextmenu="return false">
+
+<div class="shaka-video-container" data-shaka-player>
+  <video autoplay playsinline preload="auto"></video>
+  
+  <!-- Custom UI elements -->
+  <div class="player-brand">
+    <svg class="brand-logo" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-5-9h10v2H7z" fill="currentColor"/>
+    </svg>
+    <span class="brand-text">Tsn 1</span>
+  </div>
+  
+  <div class="quality-indicator">FHD</div>
+  
+  <div class="loading-spinner">
+    <div class="spinner"></div>
+  </div>
+  
+  <div class="error-message">
+    <div class="error-title">Stream Error</div>
+    <div class="error-details">Unable to load the video stream. Please try again later.</div>
+  </div>
+</div>
+
+<!-- Telegram Popup -->
+<div class="telegram-popup" id="telegramPopup">
+  <div class="telegram-link" id="telegramLink">
+    Join our Telegram: @matcheslinks
+  </div>
+  <div class="telegram-button" id="telegramButton">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.25-.41-.82-.5-1.24-.25l-2.49 1.62-1.06-.88c-.3-.25-.73-.19-.99.1l-.02.03-1.56 2.03c-.23.3-.18.72.12.95.16.12.36.17.55.11l1.81-.72 1.25 1.04c.15.12.34.18.53.14.19-.04.36-.15.46-.32l2.49-4.22c.18-.3.09-.68-.21-.86z"/>
+    </svg>
+  </div>
+</div>
+
+<!-- Telegram Modal Popup Container -->
+<div id="popup-container"></div>
+
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+  // Show Telegram modal popup
+  const container = document.getElementById('popup-container');
+  const popup = document.createElement('div');
+  popup.classList.add('modal');
+  popup.innerHTML = `
+    <div class="modal-content">
+      <h2>Support Us!</h2>
+      <p>Join our Telegram channel <br><strong>@matcheslinks</strong> for more updates.</p>
+      <button id="joinButton">Join Now and support us</button>
+      <button id="closeButton">Already Joined</button>
+    </div>
+  `;
+  container.appendChild(popup);
+
+  popup.querySelector('#joinButton').onclick = () => {
+    window.open("https://t.me/matcheslinks", "_blank");
+  };
+
+  popup.querySelector('#closeButton').onclick = () => {
+    popup.remove();
+  };
+
+  // Security measures
+  document.addEventListener('contextmenu', e => e.preventDefault());
+  document.addEventListener('keydown', e => {
+    if (e.keyCode == 123 || 
+        (e.ctrlKey && e.shiftKey && (e.keyCode == 73 || e.keyCode == 74 || e.keyCode == 67)) || 
+        (e.ctrlKey && e.keyCode == 85)) {
+      e.preventDefault();
+    }
+  });
+
+  // DevTools detection
+  let devtoolsOpen = false;
+  setInterval(() => {
+    const start = performance.now();
+    debugger;
+    const time = performance.now() - start;
+    if (time > 100) {
+      devtoolsOpen = true;
+      alert('Developer tools are not allowed.');
+      location.reload();
+    }
+  }, 500);
+
+  // Initialize Shaka Player
+  shaka.polyfill.installAll();
+  if (!shaka.Player.isBrowserSupported()) {
+    showError("Browser Not Supported", "Your browser does not support the required video playback technology.");
+    return;
+  }
+
+  const video = document.querySelector('video');
+  const player = new shaka.Player();
+  const loadingSpinner = document.querySelector('.loading-spinner');
+  const qualityIndicator = document.querySelector('.quality-indicator');
+  
+  // Show loading spinner when buffering
+  player.addEventListener('buffering', (e) => {
+    loadingSpinner.style.display = e.buffering ? 'block' : 'none';
+  });
+
+  try {
+    await player.attach(video);
+    const container = document.querySelector('.shaka-video-container');
+    const ui = new shaka.ui.Overlay(player, container, video);
+
+    // Custom UI configuration
+    ui.configure({
+      controlPanelElements: [
+        'play_pause', 'time_and_duration', 'mute', 'volume',
+        'spacer', 'language', 'captions', 'picture_in_picture',
+        'quality', 'fullscreen'
+      ],
+      volumeBarColors: {
+        base: 'rgba(255, 255, 255, 0.2)',
+        level: 'var(--volume-level)'
+      },
+      seekBarColors: {
+        base: 'var(--bg-dark)',
+        buffered: 'var(--seekbar-buffered)',
+        played: 'var(--seekbar-played)'
+      },
+      overflowMenuButtons: ['quality', 'captions', 'language']
+    });
+
+    // DRM configuration
+    const clearKeysAll = {
+      "7e99f734748d098cbfa2f7bde968dd44": "98ea6088c3222e9abaf61e537804d6cc"
+    };
+
+    player.configure({
+      drm: { clearKeys: clearKeysAll },
+      abr: { enabled: true },
+      streaming: {
+        lowLatencyMode: true,
+        bufferingGoal: 20,
+        rebufferingGoal: 5,
+        bufferBehind: 20
+      }
+    });
+
+    // Network configuration
+    player.getNetworkingEngine().registerRequestFilter((type, request) => {
+      request.headers['Referer'] = 'https://astro.com.my/';
+      request.headers['User-Agent'] = 'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Mobile Safari/537.36';
+    });
+
+    // Quality indicator update
+    player.addEventListener('variantchanged', (e) => {
+      const height = e.newVariant.video.height || 0;
+      if (height >= 1080) {
+        qualityIndicator.textContent = 'UHD';
+        qualityIndicator.style.color = 'var(--primary)';
+      } else if (height >= 720) {
+        qualityIndicator.textContent = 'HD';
+        qualityIndicator.style.color = 'var(--primary)';
+      } else {
+        qualityIndicator.textContent = 'SD';
+        qualityIndicator.style.color = 'var(--text-muted)';
+      }
+    });
+
+    // Load stream with retry logic
+    const tryLoadStream = async (auth) => {
+      const url = `https://ottb.live.cf.ww.aiv-cdn.net/lhr-nitro/live/clients/dash/enc/u142pfptsm/out/v1/1caa3b2dfa9e448d8f61209bdfc1acdc/cenc.mpd`;
+      try {
+        await player.load(url);
+        console.log(`✅ Stream loaded successfully (auth=${auth})`);
+        return true;
+      } catch (err) {
+        console.warn(`Stream load failed (auth=${auth}):`, err.message);
+        return false;
+      }
+    };
+
+    let success = await tryLoadStream(2);
+    if (!success) {
+      console.log("🔁 Trying fallback auth=1");
+      success = await tryLoadStream(1);
+    }
+
+    if (!success) {
+      showError("Stream Unavailable", "The video stream could not be loaded. Please check your connection.");
+    }
+
+    // Auto-play handling
+    const attemptAutoplay = async () => {
+      try {
+        video.muted = false;
+        await video.play();
+      } catch {
+        try {
+          video.muted = true;
+          await video.play();
+        } catch (err) {
+          console.warn("Autoplay failed:", err.message);
+        }
+      }
+    };
+
+    video.addEventListener('canplay', attemptAutoplay, { once: true });
+    setTimeout(() => { if (video.paused) attemptAutoplay(); }, 2000);
+
+    video.addEventListener('loadedmetadata', () => {
+      video.volume = 0.8;
+    });
+
+    // Unmute on interaction
+    ['click', 'touchstart', 'keydown'].forEach(evt =>
+      document.addEventListener(evt, () => { 
+        if (video.muted) video.muted = false; 
+      }, { once: true })
+    );
+
+  } catch (err) {
+    console.error("Player initialization failed:", err);
+    showError("Initialization Error", "Failed to initialize the video player.");
+  }
+
+  function showError(title, message) {
+    const errorElement = document.querySelector('.error-message');
+    document.querySelector('.error-title').textContent = title;
+    document.querySelector('.error-details').textContent = message;
+    errorElement.style.display = 'block';
+  }
+});
+
+// Telegram Popup Functionality
+const telegramPopup = document.getElementById('telegramPopup');
+const telegramButton = document.getElementById('telegramButton');
+const telegramLink = document.getElementById('telegramLink');
+
+// Function to redirect to Telegram
+const redirectToTelegram = () => {
+  window.open('https://t.me/matcheslinks', '_blank');
+};
+
+// Click handler for both button and link
+telegramButton.addEventListener('click', (e) => {
+  e.stopPropagation();
+  telegramPopup.classList.toggle('expanded');
+  // Redirect immediately if clicked while expanded
+  if (telegramPopup.classList.contains('expanded')) {
+    redirectToTelegram();
+  }
+});
+
+telegramLink.addEventListener('click', (e) => {
+  e.stopPropagation();
+  redirectToTelegram();
+});
+
+// Optional: Auto-hide the popup after some time
+let hideTimeout;
+const resetHideTimeout = () => {
+  clearTimeout(hideTimeout);
+  hideTimeout = setTimeout(() => {
+    telegramPopup.classList.remove('expanded');
+  }, 5000);
+};
+
+telegramPopup.addEventListener('mouseenter', () => {
+  clearTimeout(hideTimeout);
+});
+
+telegramPopup.addEventListener('mouseleave', resetHideTimeout);
+
+// Initialize with expanded state for a few seconds
+telegramPopup.classList.add('expanded');
+resetHideTimeout();
+</script>
+</body>
+</html>
